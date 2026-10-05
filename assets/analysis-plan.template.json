@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "mode": "audit-only",
+  "alpha": 0.05,
+  "input_manifest": "REPLACE_SOURCE_MANIFEST",
+  "descriptive": {"unit": "REPLACE_DESCRIPTIVE_UNIT", "ddof": 0},
+  "paired": {"unit": "REPLACE_PAIRED_UNIT", "expected_pairs": null, "zero_method": "wilcox", "zero_tolerance": 0.0, "rank_decimals": null, "p_method": "exact_signflip", "continuity_correction": false},
+  "ci": {"target": "paired_hodges_lehmann", "type": "percentile_bootstrap", "level": 0.95, "side": "two-sided", "resamples": 10000, "seed": 20260916, "resampling_unit": "REPLACE_UNIT", "multiplicity_adjusted": false},
+  "comparisons": [
+    {"comparison_id": "REPLACE_COMPARISON_ID", "dataset": "REPLACE_DATASET", "task": "REPLACE_TASK", "protocol": "REPLACE_PROTOCOL", "metric": "REPLACE_METRIC", "left": "REPLACE_LEFT", "right": "REPLACE_RIGHT", "evaluation_set": "test", "alternative": "two-sided", "family_id": "REPLACE_FAMILY"}
+  ],
+  "families": [
+    {"family_id": "REPLACE_FAMILY", "method": "BH", "role": "primary", "comparison_ids": ["REPLACE_COMPARISON_ID"], "expected_m": null, "rationale": "REPLACE_SCIENTIFIC_FAMILY_DEFINITION"}
+  ],
+  "notes": ["Replace all placeholders and null required counts before analysis; no project-specific sample size is assumed."]
+}

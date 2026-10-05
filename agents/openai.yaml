@@ -1,0 +1,13 @@
+interface:
+  display_name: 科研统计检验与审计
+  short_description: 统一科研比较的数据格式、配对检验、多重校正及可复现审计流程
+  default_prompt: 使用 $audit-research-statistics 审计这些实验结果，先确认原始数据格式、配对单位和分析计划，再核对检验、效应量、置信区间及多重校正。
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

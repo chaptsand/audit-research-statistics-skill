@@ -1,0 +1,17 @@
+{
+  "comparison_id": "REPLACE_ID",
+  "left_name": "REPLACE_LEFT",
+  "right_name": "REPLACE_RIGHT",
+  "unit": "run_mean",
+  "pair_ids": [],
+  "left": [],
+  "right": [],
+  "alternative": "two-sided",
+  "p_method": "exact_signflip",
+  "zero_tolerance": 0.0,
+  "rank_decimals": null,
+  "bootstrap_resamples": 10000,
+  "seed": 20260916,
+  "pairing_evidence": "REPLACE_WITH_SPLIT_OR_MATCHING_EVIDENCE_REFERENCE",
+  "notes": ["run_mean/fixed_run/task_mean use 1D paired arrays; fold_supplement uses Run-by-Fold 2D arrays and asymptotic p. This helper verifies numeric inputs only."]
+}
