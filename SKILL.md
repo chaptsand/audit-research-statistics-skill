@@ -1,59 +1,92 @@
 ---
 name: audit-research-statistics
-description: "Standardize and audit research model-comparison statistics and raw metric data. Use for repeated cross-validation, fixed-test repeated runs, cross-task macro comparisons, ablation studies, keyword hit-rate audits, reviewer-requested statistics, and statistical CSV/Excel QA. Covers data contracts, pairing evidence, Wilcoxon signed-rank tests, BH FDR families, rank-biserial effect sizes, Hodges-Lehmann differences and confidence intervals. Use project-supplied analysis plans rather than fixed datasets or hardcoded test counts."
+description: "Specify, reproduce, and audit statistical comparisons of research models. Use for repeated cross-validation, repeated training on fixed test sets, cross-task macro comparisons, ablation studies, keyword hit-rate analyses, reviewer-requested statistics, and statistical CSV/Excel quality assurance. Covers raw-data contracts, pairing evidence, Wilcoxon signed-rank tests, Benjamini-Hochberg adjustment, matched-pairs rank-biserial correlation, paired Hodges-Lehmann estimates, and confidence intervals. Require an explicit analysis plan; do not hardcode project-specific datasets, sample sizes, or correction families."
 ---
 
-# 科研统计检验与审计
+# Research Statistics Audit
 
-## 确定范围
+## 1. Establish scope and authority
 
-默认采用 audit-only：允许局部复算核对，只生成新的 QA 文件，不覆盖原始数据、现有结果或脚本。用户明确禁止复算或写文件时，只检查已有证据并在对话中报告，不运行计算helper。用户明确授权计算、修复或重建时再处理相应文件。修改模型、重新训练和选择新评价集需要另行授权。
+Default to `audit-only`: permit local numerical verification and create separate QA outputs without overwriting source data, existing results, or scripts. If the user prohibits recalculation or file creation, inspect existing evidence and report in the conversation. Apply corrections or regenerate results only within the explicitly authorized scope. Obtain separate authorization for model changes, retraining, or changes to evaluation sets.
 
-先完整阅读 [数据契约](references/data-contract.md)、[统计协议](references/statistical-protocol.md)。做现有结果检查时另读 [审计检查表](references/audit-checklist.md)。本 skill 针对模型指标的配对比较和独立基因/样本组的词汇命中率；不将其强行用于生存分析、因果推断或任意研究设计。
+Read [Data contract](references/data-contract.md) and [Statistical protocol](references/statistical-protocol.md) before analysis. For existing deliverables, also read [Audit checklist](references/audit-checklist.md).
 
-## 固定计划和来源
+Limit this workflow to scientifically justified paired model-score comparisons and independent-group binary hit-rate analyses. Establish another analysis plan for survival outcomes, causal questions, complex clustering, or incompatible study designs.
 
-使用 `assets/analysis-plan.template.json`，在结果检验前声明：数据版本、评价集、左右方法、配对键、统计单位、alternative、描述统计口径、完整 BH families、CI 方法及输出范围。使用预先确定的研究/论文协议，记录与推荐方法的区别。不要固定为某个项目的样本数、方法数或 family 大小。
+## 2. Specify an analysis plan
 
-仅读取原始指标数组或逐样本预测重建的准确指标。区分测试与验证数据，记录解析步骤、SHA256、源代码版本、指标定义和原始精度。仅有 Mean ± SD 时不能反推出配对分布。
+Complete `assets/analysis-plan.template.json` before calculating significance. Declare:
 
-按实际 ID 和划分证据配对。相同数组形状、文件顺序或随机种子不能单独证明配对。核查 Run/Fold 映射和评价样本集；同一划分在种子不同的情况下可构成配对依据，但记录额外训练随机性。缺失证据时标记 UNVERIFIED。
+- Source versions, evaluation sets, metric definitions, and comparison direction.
+- Pairing keys, inferential units, estimands, and test alternatives.
+- Descriptive units, SD denominator, zero handling, ties, and numerical precision.
+- Complete multiple-testing families, primary and supplementary roles, and CI methods.
+- Authorized outputs and the treatment of missing or failed experiments.
 
-## 区分描述和推断单位
+Use the supplied scientific protocol when available. Record deviations and their rationale. Distinguish a prospective plan from a retrospective standardization; do not describe a retrospective plan as preregistered. Keep datasets, run counts, task counts, and family sizes configurable.
 
-重复 K 折：先对每个 Run 内 K 折平均，再比较 R 个配对 Run 均值。展示可使用全部 R×K 折 Mean ± SD，但必须注明推断单位和 n=R。完整等权矩阵两种总体均值相同，SD不同。
+## 3. Validate provenance and pairing
 
-固定测试重复运行：根据真实重复实验设计按 Run 配对，n=R。跨任务总体：每个任务聚合为一个任务均值，按任务配对，n=T。单任务分析：在该任务内用 R 个 Run 均值。不得用排序得分或虚构 ID 恢复配对。
+Use raw score arrays or metrics reconstructed from complete sample-level predictions. Distinguish test scores from validation scores. Record source hashes, parsing rules, original precision, software versions, and the mapping of runs and folds.
 
-全部折值直接检验仅作为明确约定的补充敏感性分析，不能视为独立重复。Run 聚合减少折内伪重复，但重复 CV 仍共享样本；条件于同一数据集的波动不能代表新数据集不确定性。发现更复杂聚类、强不对称差值或假设不适用时报告限制，获确认后再改方法。
+Verify pairing through evaluation-sample identities and actual split mappings. Equal shapes, matching file order, or equal seeds alone are insufficient. Confirmed common splits may justify pairing when training seeds differ; disclose the additional training randomness. Mark unsupported pairing as `UNVERIFIED`.
 
-## 计算和检验
+Never reconstruct paired observations from published means and SDs or generate synthetic observations that match a summary.
 
-固定 Left 减 Right 的差值方向。探索/消融默认双侧；单侧须有事前方向依据。不得根据结果选择侧数。按统计协议记录零差值、ties、浮点精度、精确/渐近方法、连续性校正及环境，避免版本相关的 auto 默认。
+## 4. Separate descriptive and inferential units
 
-用正负秩和计算 r_rb；用配对差值全部 i≤j Walsh averages 的中位数计算 HL。单侧与双侧不改变点估计。Mean difference、HL 和 r_rb 可具有不同符号，检查方向定义与公式，不强求同号。
+For repeated $K$-fold cross-validation, aggregate each method $M$ within a run:
 
-主要 CI 对配对单位 bootstrap 重算 HL，至少10000次、固定种子，使用双侧95% percentile区间。折级补充 CI 按 Run 区组保留全部折重抽。说明该 CI 未多重校正，且不是当前 Wilcoxon 的反演区间。单侧 p 可搭配明确标记的双侧 CI。
+$$
+\bar{x}^{(M)}_r=\frac{1}{K}\sum_{k=1}^{K}x^{(M)}_{rk},
+\qquad r=1,\ldots,R.
+$$
 
-BH 只使用预先定义 family 的完整原始 p 列表，记录 family_id、成员和 m。主要与补充校正范围都需声明，不能按显著性或导出文件随意重组。缺失 family 成员时不能直接对已成功的行校正并声称原 family 已完成。
+Use the $R$ paired run means for the primary comparison. Performance tables may display all $RK$ fold scores if their footnotes identify the descriptive unit and the inferential sample size $n=R$.
 
-复用 `scripts/paired_stats.py` 的计算函数和显式配置接口；运行 `python scripts/test_paired_stats.py` 验证实现。该脚本接受显式组织的数值对和单位，只负责计算，不能认证来源、配对或科学假设。
+For fixed-test repeated training, pair the actual runs. For cross-task macro comparisons, aggregate each task and pair task means. For a single-task analysis, pair run means within that task.
 
-## 审计、解释和交付
+Treat direct fold-level tests as explicitly labeled supplementary analyses. Run aggregation reduces within-run pseudoreplication but does not create independent datasets. State the remaining dependence from shared data and the scope of inference.
 
-逐项标记 PASS、FAIL、UNVERIFIED、LEGACY，分开统计文件完整性、数值复现及协议合规。保留真正历史记录并隔离当前主分析；不能靠改名把缺少主分析的问题清零。优先复用正确副表或调整主列，获得修复授权后再局部重算与改生成逻辑。
+## 5. Calculate under an explicit protocol
 
-论文简表保留两组 Mean ± SD、配对单位及n、p、主要BH q、r_rb、HL和95% CI。完整精度表可保留Mean difference及Conclusion。脚注明确描述与推断的层级。不要用格式化后的数值检验。
+Fix the direction throughout:
 
-双侧显著结果结合 HL/秩方向解释；单侧只支持预设方向。q≥alpha写未检测到显著差异。等效、非劣效和彻底排除泄露需要其他预设设计，不能由不显著检验推出。
+$$
+d_i=L_i-R_i.
+$$
 
-## 资源
+Use a two-sided alternative for exploratory or ablation comparisons unless a directional hypothesis was specified before inspecting results. Record zero handling, average ranks for ties, precision adjustments, the exact or asymptotic method, continuity correction, and software versions.
 
-- `references/data-contract.md`：格式、ID、矩阵、缺失及来源记录。
-- `references/statistical-protocol.md`：公式、假设、CI、BH、命中率及官方参考。
-- `references/audit-checklist.md`：逐项QA、计数、历史口径和最小修复。
-- `assets/analysis-plan.template.json`：可填写的通用分析计划。
-- `assets/metrics-long.template.csv`：标准长表字段。
-- `assets/pairs-input.template.json`：计算helper输入字段。
-- `scripts/paired_stats.py`：单比较与完整BH family计算，默认stdout不覆盖文件。
-- `scripts/test_paired_stats.py`：合成数据与独立数值核验。
+Compute matched-pairs rank-biserial correlation from signed rank sums. Compute the paired Hodges-Lehmann estimate from all Walsh averages. Test sidedness does not change these point estimates. Mean difference, Hodges-Lehmann difference, and rank-biserial correlation can have different signs; verify their definitions rather than forcing agreement.
+
+For the default HL interval, bootstrap paired inferential units, recompute HL in each resample, and use a two-sided percentile interval with at least $10{,}000$ resamples and a fixed seed. For fold-level supplements, resample complete run blocks. Label intervals as approximate, marginal, and unadjusted for multiplicity; do not call them exact Wilcoxon-inversion intervals.
+
+Apply BH to the complete predefined family. Record its membership and size. Do not redefine families based on significance, export filenames, or successful rows.
+
+Use `scripts/paired_stats.py` for the supported numerical operations. Run `python scripts/test_paired_stats.py` when validating its implementation. The helper calculates statistics; it does not authenticate provenance, pairing, or scientific assumptions.
+
+## 6. Audit and repair minimally
+
+Assign `PASS`, `FAIL`, `UNVERIFIED`, or `LEGACY` with evidence. Report file integrity, numerical reproducibility, and protocol compliance separately. Preserve historical records and identify the current primary analysis. Relabeling an old table cannot resolve a missing compliant analysis.
+
+Prefer an existing correct supplementary table or correction column when appropriate. After authorization, repair only affected outputs and their generators. Preserve raw data and verify that future reproduction retains the corrected protocol.
+
+## 7. Report without overstating evidence
+
+Include both methods' descriptive Mean ± SD, inferential unit and $n$, Wilcoxon $p$, primary BH $q$, $r_{\mathrm{rb}}$, HL difference, and its CI. Retain full precision in machine-readable results and round only for presentation.
+
+Interpret a significant two-sided result using its stated effect direction. A one-sided result supports only the prespecified direction. For $q\geq\alpha$, report that no statistically significant difference was detected. Such a result does not establish equivalence, noninferiority, or absence of information leakage.
+
+## Resources
+
+| Resource | Purpose |
+| --- | --- |
+| [Data contract](references/data-contract.md) | Input schemas, provenance, pairing, missingness, and output fields. |
+| [Statistical protocol](references/statistical-protocol.md) | Assumptions, equations, test implementation, intervals, BH, and hit rates. |
+| [Audit checklist](references/audit-checklist.md) | Evidence requirements, QA status, counting rules, and minimal corrections. |
+| [Analysis-plan template](assets/analysis-plan.template.json) | Configurable protocol specification. |
+| [Long-format metrics template](assets/metrics-long.template.csv) | Canonical score-table columns. |
+| [Paired-input template](assets/pairs-input.template.json) | Explicit inputs to the numerical helper. |
+| [Numerical helper](scripts/paired_stats.py) | Paired comparisons and complete-family BH; writes to stdout. |
+| [Numerical tests](scripts/test_paired_stats.py) | Synthetic cases and independent numerical checks. |

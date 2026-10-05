@@ -1,51 +1,120 @@
-# 数据契约
+# Data Contract
 
-## 首选 long CSV
+## Contents
 
-使用 UTF-8、逗号分隔、完整精度。按实际设计填写字段，固定测试时 fold 为空，不制造虚拟折：
+1. [Canonical long-format scores](#1-canonical-long-format-scores)
+2. [Alternative raw formats](#2-alternative-raw-formats)
+3. [Source manifest](#3-source-manifest)
+4. [Validation requirements](#4-validation-requirements)
+5. [Analysis-plan and helper inputs](#5-analysis-plan-and-helper-inputs)
+6. [Result contract](#6-result-contract)
 
-| 字段 | 定义 |
+## 1. Canonical long-format scores
+
+Use UTF-8 CSV with a header, stable identifiers, and unrounded numerical values. Leave `fold` empty for a fixed-test repeated-run design.
+
+| Field | Definition |
 | --- | --- |
-| dataset | 数据集或网络ID |
-| task | 实际预测任务或子组ID |
-| protocol | 训练/信息流协议 |
-| method | 方法及特征模式ID |
-| metric | 精确指标定义，如 AUROC、PR_AUC_trapezoid、AP |
-| run | 稳定重复实验ID |
-| fold | 稳定CV折ID，无CV则为空 |
-| score | 原始测试指标值 |
-| split_id | 划分ID，优先使用评价样本集合校验和 |
-| evaluation_set | test 或 validation |
-| seed | 随机种子；未知填写空并在manifest解释 |
+| `dataset` | Dataset or network identifier. |
+| `task` | Prediction task or subgroup identifier. |
+| `protocol` | Training and information-flow protocol. |
+| `method` | Method identifier, including feature mode when relevant. |
+| `metric` | Exact metric definition, such as `AUROC`, `PR_AUC_trapezoid`, or `AP`. |
+| `run` | Stable repetition identifier. |
+| `fold` | Stable cross-validation fold identifier, when applicable. |
+| `score` | Original evaluation score at full available precision. |
+| `split_id` | Verifiable split identifier, preferably linked to evaluation-sample IDs. |
+| `evaluation_set` | `test` or `validation`. |
+| `seed` | Training seed; leave empty and explain when unknown. |
 
-声明唯一键，通常为 dataset/task/protocol/method/metric/run/fold/evaluation_set。如果一个Run还有重复采样、模型副本等层级，增加相应ID。跨任务分析保留明确task_id，不能用任意文件顺序作任务配对。
+Declare a unique observation key. A typical key is
 
-## 文件与来源
+$$
+(\mathrm{dataset},\mathrm{task},\mathrm{protocol},\mathrm{method},
+\mathrm{metric},\mathrm{run},\mathrm{fold},\mathrm{evaluation\_set}).
+$$
 
-记录源路径、SHA256、版本、数据尺度、原始数值精度、解析代码、模型参数、特征模式、种子、划分文件/哈希及Run/Fold映射。SHA256识别版本，不能单独证明两个方法评价集相同。CSV标准化副本应能无损追溯原始输入。
+Add identifiers for nested resampling, repeated model instances, or other experimental levels. Preserve task IDs for cross-task pairing. Arbitrary file order is not a matching key.
 
-兼容TXT/CSV/NPY数组及完整原始日志。重复CV格式为R行×K列，行Run、列Fold；固定测试为R个分数加ID；跨任务为每个任务一份R×K数组加task ID。展平/转置必须有来源映射依据，不能凭性能趋势猜测。
+## 2. Alternative raw formats
 
-仅有汇总Mean±SD、图片或论文格式化表不能恢复Wilcoxon、配对效应量或HL/CI。不得造出满足汇总数字的人工原始数据。
+Accept TXT, CSV, NPY, and complete raw logs when their mappings are documented.
 
-## 质量和配对
+| Design | Numerical structure | Required mapping |
+| --- | --- | --- |
+| Repeated cross-validation | $R\times K$ matrix | Rows are runs; columns are folds. |
+| Fixed-test repeated training | Length-$R$ vector | Each score maps to a run and evaluation set. |
+| Multiple tasks | One $R_t\times K_t$ matrix per task | Task, run, and fold identities. |
 
-检查有限值、指标声明的范围/尺度、重复键、配对缺失、指标计算定义、真实测试集合及重跑覆盖。AUROC/AUPRC可声明[0,1]；其他指标按实际范围。AP和梯形PR AUC不能改名后直接视为相同。
+Document every reshape, transpose, or aggregation. Infer neither orientation nor pairing from performance trends. Keep original files read-only and store normalized derivatives separately.
 
-缺失Run、失败折和无阳性测试集均需记录。未经批准不能删行、填均值或复制折；批准完整配对分析后记录原n、保留n和删除原因，说明family处理。缺折时，不保证折均值等于等权Run均值。
+Published Mean ± SD, images, and rounded manuscript tables do not identify the paired score distribution. They cannot recover signed-rank tests, paired effect sizes, or HL intervals.
 
-种子相同不证明划分一致；种子不同不自动取消同一划分的配对。需要实际split证据和对应映射。只提供同形矩阵则配对可信性标记UNVERIFIED。
+## 3. Source manifest
 
-原始文件只读。新解析副本、QA、汇总和论文排版表分开保存。记录环境的Python、NumPy、SciPy及所有实际包确切版本。
+Record:
 
-## 分析计划
+- Source paths, SHA-256 checksums, data versions, original precision, and metric scales.
+- Parser version and any normalization or orientation transformations.
+- Model configuration, feature mode, training protocol, seeds, and code version.
+- Split-file hashes, evaluation-sample identities, and run/fold mapping.
+- Missing, failed, undefined, or overwritten experiments.
+- Exact Python, NumPy, SciPy, and other relevant package versions.
 
-使用 `assets/analysis-plan.template.json`，逐项声明comparison_id、Left/Right、metric、评价集、推断单位、alternative、描述单位与ddof、完整family成员、CI、零值与精度规则。计划不能从结果显著性倒推。
+A checksum identifies a file version; it does not independently establish that two methods evaluated the same samples. A manually assigned `split_id` also requires supporting evidence.
 
-计算helper的输入只能在上述验证后创建。`unit=run_mean`与`fixed_run`输入一维配对值；`task_mean`输入任务均值；`fold_supplement`输入有真实Run区组映射的R×K数组。helper验证数值但不证明配对设计。
+When deriving scores from predictions, retain sample IDs, true labels, prediction scores, the positive-class convention, and the exact metric calculation and aggregation rules.
 
-## 输出字段
+## 4. Validation requirements
 
-完整结果至少有comparison_id、Left/Right、差值定义、source/hash、descriptive_unit、mean/sd/ddof、paired_unit、n_pairs/n_nonzero、alternative、test_method、zero_method、rank_precision、W_plus/W_minus、statistic、p、family_id/m、q、r_rb、mean_diff、hl_diff、ci_low/high、ci_method、bootstrap_n/seed、status。
+Check finite values, declared ranges, duplicate keys, missing pairs, metric definitions, and evaluation-set identities. If the metric has a declared range $[a,b]$, verify every score lies within it. Do not assume every metric is bounded by $[0,1]$. Average precision and trapezoidal PR area are distinct quantities.
 
-描述统计和推断可用不同单位，必须标注。跨任务SD按任务均值计算，不能把混合层级的列全部标成Run SD。保留full_precision，最后单独格式化论文表。
+Document failed runs and undefined metrics, including single-class test sets. Do not silently drop observations, impute scores, or duplicate folds. If a complete-pair analysis is authorized, record the original and retained counts, exclusion reasons, and implications for the analysis and correction family.
+
+Validate pairing from actual split evidence. Equal seeds do not prove common splits; different seeds do not invalidate independently confirmed common splits.
+
+Distinguish
+
+$$
+n_{\mathrm{pairs}}=n
+\quad\text{from}\quad
+n_{\mathrm{nonzero}}
+=\sum_{i=1}^{n}\mathbf{1}(\widetilde d_i\neq0),
+$$
+
+where $\widetilde d_i$ is the difference after any explicitly declared rank-only precision handling. Retain the original $d_i$, including zeros, for mean difference, HL, and bootstrap calculations.
+
+With missing folds or unequal fold counts, the mean of all available folds need not equal the equally weighted mean of run means.
+
+## 5. Analysis-plan and helper inputs
+
+Complete `assets/analysis-plan.template.json` with comparison IDs, left and right methods, metric definitions, evaluation sets, units, alternatives, descriptive conventions, rank settings, complete families, intervals, and authorized outputs.
+
+Prepare helper input only after verifying these requirements:
+
+| `unit` | Input shape | `pair_ids` |
+| --- | --- | --- |
+| `run_mean` | One-dimensional paired run means | Run IDs. |
+| `fixed_run` | One-dimensional paired repeated-run scores | Run IDs. |
+| `task_mean` | One-dimensional paired task means | Task IDs. |
+| `fold_supplement` | Paired two-dimensional run-by-fold matrices | Run-block IDs. |
+
+Supply a meaningful `pairing_evidence` reference. The helper checks input structure and numerical values; it cannot authenticate the referenced evidence or validate the study design.
+
+The bundled helper implements `zero_method=wilcox`, `p_method=exact_signflip` or `asymptotic`, and two-sided 95% percentile-bootstrap HL intervals. For a different declared protocol, use and validate an appropriate implementation rather than relabeling these outputs.
+
+## 6. Result contract
+
+Retain machine-readable fields for:
+
+| Category | Required information |
+| --- | --- |
+| Identity and provenance | `comparison_id`, task, metric, left/right methods, difference direction, sources, hashes. |
+| Descriptive statistics | Unit, both means and SDs, `ddof`, and observation counts. |
+| Inferential design | Paired unit, `n_pairs`, `n_nonzero`, pairing evidence, and alternative. |
+| Test implementation | Method, zero rule, rank precision, tolerance, continuity correction, $W_+$, $W_-$, statistic, and $p$. |
+| Multiple testing | `family_id`, membership, $m$, primary/supplementary role, and BH $q$. |
+| Effects and intervals | $r_{\mathrm{rb}}$, mean difference, HL difference, CI limits, target, method, level, resampling unit, resample count, seed, and multiplicity status. |
+| Verification | Environment, integrity status, numerical status, protocol status, and evidence. |
+
+Label different levels explicitly. Across-task SD describes dispersion among task means; it is not run-level SD. Preserve full precision in analysis files and format manuscript tables as separate derivatives.
